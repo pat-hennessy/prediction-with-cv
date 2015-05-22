@@ -1,0 +1,233 @@
+---
+    output: html_document
+---
+    
+```{r echo = FALSE, message = FALSE, warnings = FALSE}
+# Set up
+library(knitr)
+library(caret)
+library(dplyr)
+library(ggplot2)
+opts_chunk$set(message = FALSE, warnings = FALSE)
+```
+
+
+
+# Prediction of Exercise Technique From Body Sensor Data
+
+## Overview
+In this report we will attempt to predict one of five techniques used in barbell lifts using attached body sensors.  Various machine learning algorithms were applied to the training data, and the best (i.e., most accurate) algorithm selected to run against the test data.
+
+## The Data
+The training data for the study was downloaded from here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data for the study was downloaded from here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Data Preparation
+The training data consists of ~20K samples of 160 variables, one of which is the indicator of the exercise technique used.
+
+```{r}
+data1 <- read.csv("pml-training.csv")
+dim(data1)
+```
+
+Examination of the data revealed that there were numerous variables that were NA or null for certain records.  These variables were eliminated from the data analysis.  There remained 53 variables for the analysis shown below.
+
+```{r}
+data2 <- data1 %>%
+    select(
+        roll_belt,
+        pitch_belt,
+        yaw_belt,
+        total_accel_belt,
+        gyros_belt_x,
+        gyros_belt_y,
+        gyros_belt_z,
+        accel_belt_x,
+        accel_belt_y,
+        accel_belt_z,
+        magnet_belt_x,
+        magnet_belt_y,
+        magnet_belt_z,
+        roll_arm,
+        pitch_arm,
+        yaw_arm,
+        total_accel_arm,
+        gyros_arm_x,
+        gyros_arm_y,
+        gyros_arm_z,
+        accel_arm_x,
+        accel_arm_y,
+        accel_arm_z,
+        magnet_arm_x,
+        magnet_arm_y,
+        magnet_arm_z,
+        roll_dumbbell,
+        pitch_dumbbell,
+        yaw_dumbbell,
+        total_accel_dumbbell,
+        gyros_dumbbell_x,
+        gyros_dumbbell_y,
+        gyros_dumbbell_z,
+        accel_dumbbell_x,
+        accel_dumbbell_y,
+        accel_dumbbell_z,
+        magnet_dumbbell_x,
+        magnet_dumbbell_y,
+        magnet_dumbbell_z,
+        roll_forearm,
+        pitch_forearm,
+        yaw_forearm,
+        total_accel_forearm,
+        gyros_forearm_x,
+        gyros_forearm_y,
+        gyros_forearm_z,
+        accel_forearm_x,
+        accel_forearm_y,
+        accel_forearm_z,
+        magnet_forearm_x,
+        magnet_forearm_y,
+        magnet_forearm_z,
+        classe)
+dim(data2)
+```
+
+## Data Partitioning
+Only the training data set is used in this analysis, although the best model was ultimately used against the 20 samples in the downloaded test data set to generate the predictions submitted to the course web site for scoring.
+
+In order that experimentation could be performed within reasonable time constraints, a random sample of 10% of the training data was taken to reduce model training times to no more than 10 minutes.  It was felt that this sample size would be adequate to compare the accuracy of the various models to be evaluated.
+
+```{r}
+trialIdx <- createDataPartition(y = data2$classe, p = .1, list = FALSE)
+trialData <- data2[trialIdx, ]
+```
+
+In order to test the accuracy of each model, we created a new "test" data set from the trial data.  Thus, the trial data was partitioned into a "trial" training set and a "trial" test set.
+
+```{r}
+trialTrainIdx <- createDataPartition(y = trialData$classe, p = .75, list = FALSE)
+trialTraining <- trialData[trialTrainIdx, ]
+trialTesting <- trialData[-trialTrainIdx, ]
+```
+
+
+## Model Selection
+Four algorithms were chosen, more or less at random, to run against the trial data.  The goal was to see how their prediction accuracies compared, and then to select the model with the best accuracy to train against the complete training data set and then  apply to the test data for scoring.  The models chosen for comparison were Random Forest (rf), Linear Discriminant Analysis (lda), Naive Bayes (nb), and Generalized Boosted Regression (gbm).
+
+The code for the first of these is shown below.  The code for the others is the same except for the "method" argument which specifies the algorithm to use.  The accuracy of each model is displayed following its execution.  The train control (trControl) argument was configured to set the re-sampling method to cross validation (cv) and limit the number of folds in order to speed up the execution compared to the default.
+
+Random Forest:
+```{r cache = TRUE}
+set.seed(32343)
+trnCtrl <- trainControl(method = "cv", number = 5)
+modFit <- train(classe ~ ., trControl = trnCtrl, data = trialTraining, method = "rf", verbose = FALSE)
+predictions <- predict(modFit, newdata = trialTesting)
+confusionMatrix(predictions, trialTesting$classe)$overall[1]
+```
+
+Linear Discriminant Analysis:
+
+```{r cache = TRUE, echo = FALSE}
+set.seed(32343)
+trnCtrl <- trainControl(method = "cv", number = 5)
+modFit <- train(classe ~ ., trControl = trnCtrl, data = trialTraining, method = "lda", verbose = FALSE)
+predictions <- predict(modFit, newdata = trialTesting)
+confusionMatrix(predictions, trialTesting$classe)$overall[1]
+```
+
+Naive Bayes:
+
+```{r cache = TRUE, echo = FALSE}
+set.seed(32343)
+trnCtrl <- trainControl(method = "cv", number = 5)
+modFit <- train(classe ~ ., trControl = trnCtrl, data = trialTraining, method = "nb", verbose = FALSE)
+predictions <- predict(modFit, newdata = trialTesting)
+confusionMatrix(predictions, trialTesting$classe)$overall[1]
+```
+
+Generalized Boosted Regression:
+
+```{r cache = TRUE, echo = FALSE}
+set.seed(32343)
+trnCtrl <- trainControl(method = "cv", number = 5)
+modFit <- train(classe ~ ., trControl = trnCtrl, data = trialTraining, method = "gbm", verbose = FALSE)
+predictions <- predict(modFit, newdata = trialTesting)
+confusionMatrix(predictions, trialTesting$classe)$overall[1]
+```
+
+It can be seen that the Random Forest produces the best accuracy, so this is the model that will be trained on the full training set and used to predict the exercise technique in the testing data set.  Due to the extreme execution time of this model on the full training set (~8 hours), this training and testing were performed outside of this report.
+
+## Cross-validation and Estimated Out-of-sample Error
+Although the caret train() function will run cross-validation model fits, we decided to perform a manual demonstration of cross-validation to produce an estimate of the out-of-sample error.  The full training set, data2, (vs. the 10% trialData above) is partitioned into a "cv" training set and a "cv" test set.
+
+```{r}
+cvTrainIdx <- createDataPartition(y = data2$classe, p = .75, list = FALSE)
+cvTraining <- data2[cvTrainIdx, ]
+cvTesting <- data2[-cvTrainIdx, ]
+```
+
+The cv training set is then divided into 3 folds (just to keep things simple for demonstration).
+
+```{r}
+folds <- createFolds(y = cvTraining$classe, k = 3, returnTrain = TRUE)
+```
+
+Then we'll train 3 separate models on the three unique combinations of 2 folds (provided by "returnTrain = TRUE").
+
+```{r}
+library(randomForest)
+set.seed(32343)
+mod1 <- randomForest(classe ~ ., data = cvTraining[folds[[1]], ])
+
+set.seed(32343)
+mod2 <- randomForest(classe ~ ., data = cvTraining[folds[[2]], ])
+
+set.seed(32343)
+mod3 <- randomForest(classe ~ ., data = cvTraining[folds[[3]], ])
+```
+
+Then we'll predict the outcome for each model against each "third fold" of the cv training set (i.e., -folds[[n]]), and compare that to the actual outcome with confusionMatrix() to get the accuracy of each fold's model.
+
+```{r}
+predictions <- predict(mod1, newdata = cvTraining[-folds[[1]], ])
+mod1Acc <- confusionMatrix(predictions, cvTraining[-folds[[1]], ]$classe)$overall[1]
+
+predictions <- predict(mod2, newdata = cvTraining[-folds[[2]], ])
+mod2Acc <- confusionMatrix(predictions, cvTraining[-folds[[2]], ]$classe)$overall[1]
+
+predictions <- predict(mod3, newdata = cvTraining[-folds[[3]], ])
+mod3Acc <- confusionMatrix(predictions, cvTraining[-folds[[3]], ]$classe)$overall[1]
+
+mod1Acc
+mod2Acc
+mod3Acc
+```
+
+Then we average the accuracy over all three models which gives us the estimated out-of-sample error (i.e., one minus the accuracy).
+
+```{r}
+modAccAvg <- (mod1Acc + mod2Acc + mod3Acc) / 3
+modAccAvg
+```
+
+Finally, we get the actual out-of-sample error by traing a new model on the full cv training data set and running it against the cv test data set.
+
+```{r}
+set.seed(32343)
+mod4 <- randomForest(classe ~ ., data = cvTraining)
+predictions <- predict(mod4, newdata = cvTesting)
+mod4Acc <- confusionMatrix(predictions, cvTesting$classe)$overall[1]
+mod4Acc
+```
+
+As we can see, the estimated out-of-sample accuracy (one minus the error) is quite close to the actual out-of-sample accuracy.
+
+
+
+
+
+
